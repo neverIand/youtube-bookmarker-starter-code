@@ -3,21 +3,30 @@
   let currentVideo = "";
   let currentVideoBookmarks = [];
 
-  // listen to message from background.js
-  chrome.runtime.onMessage.addListener((obj, sender, response) => {
-    const { type, value, videoId } = obj;
-
-    if (type === "NEW") {
-      currentVideo = videoId;
-      newVideoLoaded();
-    }
-  });
-
   const fetchBookmarks = () => {
     return new Promise((resolve) => {
       chrome.storage.sync.get([currentVideo], (obj) => {
         resolve(obj[currentVideo] ? JSON.parse(obj[currentVideo]) : []);
       });
+    });
+  };
+
+  const addNewBookmarkEventHandler = async () => {
+    const currentTime = youtubePlayer.currentTime;
+    const newBookmark = {
+      time: currentTime,
+      desc: "Bookmark at " + getTime(currentTime),
+    };
+    console.log("newBookmark", newBookmark);
+
+    currentVideoBookmarks = await fetchBookmarks();
+
+    console.log("currentVideoBookmarks", currentVideoBookmarks);
+
+    chrome.storage.sync.set({
+      [currentVideo]: JSON.stringify(
+        [...currentVideoBookmarks, newBookmark].sort((a, b) => a.time - b.time)
+      ),
     });
   };
 
@@ -47,22 +56,16 @@
     bookmarkBtn.addEventListener("click", addNewBookmarkEventHandler);
   };
 
-  const addNewBookmarkEventHandler = async () => {
-    const currentTime = youtubePlayer.currentTime;
-    const newBookmark = {
-      time: currentTime,
-      desc: "Bookmark at " + getTime(currentTime),
-    };
-    console.log("newBookmark", newBookmark);
+  // listen to message from background.js
+  chrome.runtime.onMessage.addListener((obj, sender, response) => {
+    const { type, value, videoId } = obj;
 
-    currentVideoBookmarks = await fetchBookmarks();
-
-    chrome.storage.sync.set({
-      [currentVideo]: JSON.stringify(
-        [...currentVideoBookmarks, newBookmark].sort((a, b) => a.time - b.time)
-      ),
-    });
-  };
+    if (type === "NEW") {
+      currentVideo = videoId;
+      console.log("message received, currentVideo", currentVideo);
+      newVideoLoaded();
+    }
+  });
 
   // call it again as a dirty quick fix because if the page got refreshed (which does not trigger tab url update) the button could disappear
   newVideoLoaded();
